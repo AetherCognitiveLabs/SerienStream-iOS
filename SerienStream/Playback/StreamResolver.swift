@@ -135,25 +135,30 @@ extension StreamResolver: WKNavigationDelegate {
             decisionHandler(.allow)
             return
         }
+        // Challenge-Iframes (Turnstile/ALTCHA) müssen durchgelassen werden
+        if host.contains("challenges.cloudflare.com") || host.contains("cloudflare") {
+            decisionHandler(.allow)
+            return
+        }
         // Navigationen weg von serienstream → das ist die Hoster-Embed-URL
         let isSS = Self.allowedHosts.contains(host)
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
 
         if !isSS {
-            if !isMainFrame || navigationAction.navigationType == .other {
-                state = .resolvingEmbed
-                finish(.success(url))
-                decisionHandler(.cancel)
+            // about:blank, data:, blob: etc. ignorieren
+            if url.scheme == "about" || url.scheme == "data" || url.scheme == "blob" {
+                decisionHandler(.allow)
                 return
             }
-            // Auch Main-Frame-Redirects zu Hostern abfangen (Fallback)
-            if isMainFrame && !url.absoluteString.contains("serienstream") {
+            // Erfolg nur bei echten http(s)-Navigationen zu externen Hosts
+            if url.scheme == "http" || url.scheme == "https" {
                 state = .resolvingEmbed
                 finish(.success(url))
                 decisionHandler(.cancel)
                 return
             }
         }
+        _ = isMainFrame
         decisionHandler(.allow)
     }
 

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var catalog: CatalogStore
+    @EnvironmentObject private var history: WatchHistoryStore
+
     struct GenreItem: Identifiable { let id: String; let label: String }
     let genres: [GenreItem] = [
         GenreItem(id: "action", label: "Action"), GenreItem(id: "animation", label: "Animation"), GenreItem(id: "anime", label: "Anime"),
@@ -10,45 +12,32 @@ struct HomeView: View {
         GenreItem(id: "thriller", label: "Thriller"), GenreItem(id: "dokumentation", label: "Doku"), GenreItem(id: "familie", label: "Familie")
     ]
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 26) {
                     if let error = catalog.error {
                         errorBanner(error)
                     }
 
-                    SectionHeader(title: "Beliebte Serien")
-                        .padding(.horizontal)
-
-                    if catalog.popular.isEmpty && catalog.loading {
-                        ProgressView().tint(DS.accent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(catalog.popular) { series in
-                                NavigationLink(value: series.slug) {
-                                    CoverCard(series: series)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal)
+                    if !history.recent.isEmpty {
+                        continueWatchingSection
                     }
 
-                    SectionHeader(title: "Genres")
-                        .padding(.horizontal)
                     genreChips
-                        .padding(.bottom, 32)
+
+                    if catalog.sections.isEmpty && catalog.loading {
+                        ProgressView().tint(DS.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                    } else {
+                        ForEach(Array(catalog.sections.enumerated()), id: \.offset) { _, section in
+                            sectionRow(section)
+                        }
+                    }
                 }
-                .padding(.top, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
             .background(DS.bg.ignoresSafeArea())
             .navigationTitle("SerienStream")
@@ -66,6 +55,47 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Continue Watching
+
+    private var continueWatchingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Weiterschauen")
+                .padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(history.recent.prefix(12).map { $0 }) { entry in
+                        NavigationLink(value: entry.seriesSlug) {
+                            ContinueCard(entry: entry, coverURL: catalog.coverURL(for: entry.seriesSlug))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    // MARK: - Sections
+
+    private func sectionRow(_ section: SerienStreamClient.PopularSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: section.title)
+                .padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(section.series) { series in
+                        NavigationLink(value: series.slug) {
+                            CoverCard(series: series)
+                                .frame(width: 110)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
     private func errorBanner(_ message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -73,9 +103,9 @@ struct HomeView: View {
             Text(message)
                 .font(.footnote)
                 .foregroundColor(DS.textSecondary)
+            Spacer()
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .glass()
         .padding(.horizontal)
     }
@@ -100,6 +130,42 @@ struct HomeView: View {
     }
 }
 
+struct ContinueCard: View {
+    let entry: WatchEntry
+    let coverURL: URL?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .bottomLeading) {
+                CoverImage(url: coverURL)
+                    .frame(width: 150, height: 96)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.cardRadius, style: .continuous)
+                            .fill(LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom))
+                    )
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("S\(entry.season) · E\(entry.episode)")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(DS.accent.opacity(0.9))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(8)
+            }
+            .frame(width: 150, height: 96)
+            Text(entry.seriesTitle)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.textPrimary)
+                .lineLimit(1)
+        }
+        .frame(width: 150, alignment: .leading)
+    }
+}
+
 struct CoverCard: View {
     let series: Series
 
@@ -107,6 +173,7 @@ struct CoverCard: View {
         VStack(alignment: .leading, spacing: 8) {
             CoverImage(url: series.coverURL)
                 .aspectRatio(2/3, contentMode: .fit)
+                .frame(maxWidth: .infinity)
             Text(series.title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(DS.textPrimary)

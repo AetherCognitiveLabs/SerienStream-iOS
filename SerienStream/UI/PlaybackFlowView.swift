@@ -17,6 +17,7 @@ struct PlaybackFlowView: View {
     let seriesTitle: String
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var history: WatchHistoryStore
     @StateObject private var resolver = StreamResolver()
 
     @State private var links: [EpisodeLink] = []
@@ -169,10 +170,12 @@ struct PlaybackFlowView: View {
                 do {
                     let result = try await HosterExtractor.shared.extract(embedURL: embedURL)
                     stream = result
+                    history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
                     phase = .playing
                 } catch {
                     // Fallback: Embed direkt in WebView abspielen
                     embedFallbackURL = embedURL
+                    history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
                     phase = .webViewFallback
                 }
             } catch {

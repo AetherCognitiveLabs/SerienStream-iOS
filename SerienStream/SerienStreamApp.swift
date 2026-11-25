@@ -4,12 +4,14 @@ import SwiftUI
 struct SerienStreamApp: App {
     @StateObject private var catalog = CatalogStore()
     @StateObject private var favorites = FavoritesStore()
+    @StateObject private var history = WatchHistoryStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(catalog)
                 .environmentObject(favorites)
+                .environmentObject(history)
                 .preferredColorScheme(.dark)
                 .task {
                     await catalog.loadAll()
@@ -90,54 +92,6 @@ struct FavoritesView: View {
             .navigationDestination(for: String.self) { slug in
                 SeriesDetailView(slug: slug)
             }
-        }
-    }
-}
-
-struct SettingsView: View {
-    @AppStorage("serienstream.domain") private var domain = "https://serienstream.to"
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Domain")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundColor(DS.textPrimary)
-                        Text("Falls eine Domain gesperrt ist, wechsle auf eine Alternative.")
-                            .font(.footnote)
-                            .foregroundColor(DS.textSecondary)
-                        ForEach(SerienStreamClient.domains, id: \.self) { d in
-                            Button {
-                                domain = d
-                            } label: {
-                                HStack {
-                                    Image(systemName: domain == d ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(domain == d ? DS.accent : DS.textTertiary)
-                                    Text(d)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(DS.textPrimary)
-                                    Spacer()
-                                }
-                                .padding(12)
-                                .glass()
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    Text("Version 1.0 — Inoffizielle SerienStream-App. Alle Inhalte stammen von serienstream.to.")
-                        .font(.caption)
-                        .foregroundColor(DS.textTertiary)
-                        .padding(.horizontal)
-                }
-                .padding(.top, 16)
-            }
-            .background(DS.bg.ignoresSafeArea())
-            .navigationTitle("Einstellungen")
-            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 }

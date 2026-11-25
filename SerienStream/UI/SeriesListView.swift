@@ -3,6 +3,7 @@ import SwiftUI
 struct SeriesListView: View {
     @ObservedObject var catalog: CatalogStore
     @State private var search = ""
+    @State private var path = NavigationPath()
 
     private var filtered: [Series] {
         if search.isEmpty { return catalog.catalog }
@@ -19,7 +20,7 @@ struct SeriesListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                     ForEach(grouped, id: \.letter) { group in
@@ -29,6 +30,9 @@ struct SeriesListView: View {
                                     SeriesRow(series: series, coverURL: catalog.coverURL(for: series.slug))
                                 }
                                 .buttonStyle(.plain)
+                                .onAppear {
+                                    catalog.loadCoverIfNeeded(for: series.slug)
+                                }
                             }
                         } header: {
                             Text(group.letter)
@@ -44,6 +48,18 @@ struct SeriesListView: View {
             }
             .background(DS.bg.ignoresSafeArea())
             .navigationTitle("Alle Serien")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        if let random = catalog.catalog.randomElement() {
+                            path.append(random.slug)
+                        }
+                    } label: {
+                        Image(systemName: "shuffle")
+                            .foregroundColor(DS.accent)
+                    }
+                }
+            }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .searchable(text: $search, prompt: "Serie suchen…")
             .navigationDestination(for: String.self) { route in

@@ -11,6 +11,7 @@ struct SeriesDetailView: View {
     @State private var error: String?
     @State private var playingEpisode: EpisodeRef?
     @EnvironmentObject private var favorites: FavoritesStore
+    @EnvironmentObject private var history: WatchHistoryStore
 
     private let client = SerienStreamClient.shared
 
@@ -42,7 +43,7 @@ struct SeriesDetailView: View {
                 }
             }
         }
-        .sheet(item: $playingEpisode) { ep in
+        .fullScreenCover(item: $playingEpisode) { ep in
             PlaybackFlowView(episode: ep, seriesTitle: detail?.title ?? "")
         }
         .task {
@@ -193,6 +194,11 @@ struct SeriesDetailView: View {
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundColor(DS.textPrimary)
                             Spacer()
+                            if history.isWatched(seriesSlug: slug, season: ep.season, episode: ep.episode) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.green)
+                            }
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: 24))
                                 .foregroundColor(DS.accent)
