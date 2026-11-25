@@ -16,8 +16,8 @@ targets:
         CFBundleName: SerienStream
         CFBundleDisplayName: SerienStream
         CFBundleIdentifier: com.serienstream.ios
-        CFBundleShortVersionString: "2.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "3.0.0"
+        CFBundleVersion: "3"
         CFBundleExecutable: SerienStream
         CFBundlePackageType: APPL
         LSRequiresIPhoneOS: true
