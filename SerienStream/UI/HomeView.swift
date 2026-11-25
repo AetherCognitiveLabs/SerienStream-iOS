@@ -31,7 +31,7 @@ struct HomeView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.top, 60)
                     } else {
-                        ForEach(Array(catalog.sections.enumerated()), id: \.offset) { _, section in
+                        ForEach(catalog.sections, id: \.title) { section in
                             sectionRow(section)
                         }
                     }
