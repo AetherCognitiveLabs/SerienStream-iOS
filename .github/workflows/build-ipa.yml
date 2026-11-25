@@ -103,6 +103,22 @@ jobs:
             cp "$CONTAINER/Documents/debug.log" ci-out/debug-detail.log
           fi
 
+      - name: Resolver smoke test (player flow)
+        run: |
+          mkdir -p ci-out
+          xcrun simctl launch booted com.serienstream.ios -smokeResolver || true
+          sleep 20
+          xcrun simctl io booted screenshot ci-out/shot-resolver-1.png || true
+          sleep 30
+          xcrun simctl io booted screenshot ci-out/shot-resolver-2.png || true
+          CONTAINER=$(xcrun simctl get_app_container booted com.serienstream.ios data 2>/dev/null || echo "")
+          if [ -n "$CONTAINER" ] && [ -f "$CONTAINER/Documents/debug.log" ]; then
+            cp "$CONTAINER/Documents/debug.log" ci-out/debug-resolver.log
+            echo "--- resolver log:"
+            cat ci-out/debug-resolver.log
+          fi
+          xcrun simctl terminate booted com.serienstream.ios || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: ci-verification
