@@ -155,8 +155,15 @@ final class WatchHistoryStore: ObservableObject {
     /// Als gesehen markierte Episoden-IDs
     @Published private(set) var watched: Set<String> = []
 
+    /// Abspielposition in Sekunden pro Episoden-ID
+    @Published private(set) var positions: [String: Double] = [:]
+    /// Gesamtdauer in Sekunden pro Episoden-ID (für Fortschrittsbalken)
+    @Published private(set) var durations: [String: Double] = [:]
+
     private static let recentKey = "serienstream.history"
     private static let watchedKey = "serienstream.watched"
+    private static let positionsKey = "serienstream.positions"
+    private static let durationsKey = "serienstream.durations"
 
     init() {
         if let data = UserDefaults.standard.data(forKey: Self.recentKey),
@@ -166,6 +173,46 @@ final class WatchHistoryStore: ObservableObject {
         if let arr = UserDefaults.standard.array(forKey: Self.watchedKey) as? [String] {
             watched = Set(arr)
         }
+        if let p = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Double] {
+            positions = p
+        }
+        if let d = UserDefaults.standard.dictionary(forKey: Self.durationsKey) as? [String: Double] {
+            durations = d
+        }
+    }
+
+    static func entryId(seriesSlug: String, season: Int, episode: Int) -> String {
+        "\(seriesSlug)-s\(season)e\(episode)"
+    }
+
+    /// Speichert die aktuelle Abspielposition. Bei >95% als gesehen markieren und Position zurücksetzen.
+    func savePosition(seriesSlug: String, seriesTitle: String, season: Int, episode: Int, position: Double, duration: Double) {
+        let id = Self.entryId(seriesSlug: seriesSlug, season: season, episode: episode)
+        if duration > 0 {
+            durations[id] = duration
+        }
+        if duration > 0, position / duration > 0.95 {
+            positions[id] = 0
+            watched.insert(id)
+        } else {
+            positions[id] = position
+        }
+        if !recent.contains(where: { $0.id == id }) {
+            markPlayed(seriesSlug: seriesSlug, seriesTitle: seriesTitle, season: season, episode: episode)
+        } else {
+            persist()
+        }
+    }
+
+    func position(seriesSlug: String, season: Int, episode: Int) -> Double {
+        positions[Self.entryId(seriesSlug: seriesSlug, season: season, episode: episode)] ?? 0
+    }
+
+    /// Fortschritt 0…1 für Fortschrittsbalken
+    func progress(seriesSlug: String, season: Int, episode: Int) -> Double {
+        let id = Self.entryId(seriesSlug: seriesSlug, season: season, episode: episode)
+        guard let pos = positions[id], pos > 0, let dur = durations[id], dur > 0 else { return 0 }
+        return min(pos / dur, 1)
     }
 
     func markPlayed(seriesSlug: String, seriesTitle: String, season: Int, episode: Int) {
@@ -195,6 +242,8 @@ final class WatchHistoryStore: ObservableObject {
     func clear() {
         recent = []
         watched = []
+        positions = [:]
+        durations = [:]
         persist()
     }
 
@@ -203,5 +252,7 @@ final class WatchHistoryStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: Self.recentKey)
         }
         UserDefaults.standard.set(Array(watched), forKey: Self.watchedKey)
+        UserDefaults.standard.set(positions, forKey: Self.positionsKey)
+        UserDefaults.standard.set(durations, forKey: Self.durationsKey)
     }
 }

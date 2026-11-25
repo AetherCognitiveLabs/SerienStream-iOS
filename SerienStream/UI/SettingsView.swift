@@ -15,6 +15,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     endpointSection
+                    playbackSection
                     dataSection
                     diagnosticsSection
                     aboutSection
@@ -133,6 +134,103 @@ struct SettingsView: View {
         probing = false
     }
 
+    // MARK: - Wiedergabe
+
+    @State private var preferredHoster: String = UserDefaults.standard.string(forKey: "serienstream.preferredHoster") ?? ""
+    @State private var autoplay: Bool = UserDefaults.standard.object(forKey: "serienstream.autoplay") as? Bool ?? true
+    @State private var preferGerman: Bool = UserDefaults.standard.object(forKey: "serienstream.preferGerman") as? Bool ?? true
+
+    private let knownHosters = ["VOE", "Doodstream", "Streamtape", "Vidoza", "Filemoon", "Voe"]
+    private let germanFlag = "de"
+
+    private var playbackSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Wiedergabe")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(DS.textPrimary)
+                .padding(.horizontal)
+
+            VStack(spacing: 0) {
+                toggleRow(icon: "forward.fill", title: "Autoplay nächste Episode", subtitle: "Startet die nächste Folge automatisch", value: $autoplay)
+                    .onChange(of: autoplay) { v in UserDefaults.standard.set(v, forKey: "serienstream.autoplay") }
+                Divider().background(DS.glassStroke)
+                toggleRow(icon: "globe", title: "Deutsch bevorzugen", subtitle: "Deutsche Hoster werden zuerst angezeigt", value: $preferGerman)
+                    .onChange(of: preferGerman) { v in UserDefaults.standard.set(v, forKey: "serienstream.preferGerman") }
+            }
+            .glass(radius: 14)
+            .padding(.horizontal)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(DS.accent)
+                        .frame(width: 34, height: 34)
+                        .background(DS.accent.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    Text("Bevorzugter Hoster")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(DS.textPrimary)
+                    Spacer()
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        hosterChip("Automatisch", value: "")
+                        ForEach(["VOE", "Doodstream", "Streamtape", "Vidoza", "Filemoon"], id: \.self) { h in
+                            hosterChip(h, value: h)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .glass(radius: 14)
+            .padding(.horizontal)
+        }
+    }
+
+    private func hosterChip(_ label: String, value: String) -> some View {
+        let active = preferredHoster == value
+        return Button {
+            preferredHoster = value
+            UserDefaults.standard.set(value, forKey: "serienstream.preferredHoster")
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(active ? .black : DS.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(active ? DS.accent : Color.white.opacity(0.08))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleRow(icon: String, title: String, subtitle: String, value: Binding<Bool>) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(DS.accent)
+                .frame(width: 34, height: 34)
+                .background(DS.accent.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(DS.textPrimary)
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundColor(DS.textSecondary)
+            }
+            Spacer()
+            Toggle("", isOn: value)
+                .labelsHidden()
+                .tint(DS.accent)
+        }
+        .padding(14)
+    }
+
     // MARK: - Daten
 
     private var dataSection: some View {
@@ -223,7 +321,7 @@ struct SettingsView: View {
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(DS.textPrimary)
                     Spacer()
-                    Text("v2.0")
+                    Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))")
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundColor(DS.textTertiary)
                 }

@@ -301,7 +301,30 @@ final class SerienStreamClient {
         for r in rows where r.count >= 2 {
             if let n = Int(r[1]) { nums.insert(n) }
         }
-        return nums.sorted().map { EpisodeRef(season: season, episode: $0, seriesSlug: slug, title: nil) }
+        // Episodentitel aus der Staffel-Tabelle (episode-row → episode-N + Titel DE/EN)
+        var titles: [Int: (String, String?)] = [:]
+        let epRows = matches(#"<tr[^>]*class="[^"]*episode-row[^"]*"[^>]*>[\s\S]*?</tr>"#, in: html)
+        for row in epRows {
+            guard let rowHTML = row.first else { continue }
+            guard let numM = matches(#"episode-(\d+)'"#, in: rowHTML).first, numM.count >= 2,
+                  let num = Int(numM[1]) else { continue }
+            var ger = ""
+            var eng: String?
+            if let g = matches(#"episode-title-ger[^"]*"[^>]*title="([^"]*)""#, in: rowHTML).first, g.count >= 2 {
+                ger = decodeEntities(g[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if ger.isEmpty, let g = matches(#"episode-title-ger[^"]*"[^>]*>([\s\S]*?)</strong>"#, in: rowHTML).first, g.count >= 2 {
+                ger = decodeEntities(stripTags(g[1])).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if let e = matches(#"episode-title-eng[^"]*"[^>]*title="([^"]*)""#, in: rowHTML).first, e.count >= 2 {
+                eng = decodeEntities(e[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if !ger.isEmpty { titles[num] = (ger, eng) }
+        }
+        return nums.sorted().map { n in
+            let t = titles[n]
+            return EpisodeRef(season: season, episode: n, seriesSlug: slug, title: t?.0, titleEng: t?.1)
+        }
     }
 
     // MARK: - Episode links (Hoster)

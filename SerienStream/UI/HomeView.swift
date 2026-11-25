@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @ObservedObject var catalog: CatalogStore
     @EnvironmentObject private var history: WatchHistoryStore
+    @EnvironmentObject private var favorites: FavoritesStore
 
     struct GenreItem: Identifiable { let id: String; let label: String }
     let genres: [GenreItem] = [
@@ -23,6 +24,8 @@ struct HomeView: View {
                     if !history.recent.isEmpty {
                         continueWatchingSection
                     }
+
+                    favoritesSection
 
                     genreChips
 
@@ -73,6 +76,39 @@ struct HomeView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    // MARK: - Favoriten
+
+    @ViewBuilder
+    private var favoritesSection: some View {
+        let favSeries = catalog.catalog.filter { favorites.isFavorite($0.slug) }
+        if !favSeries.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Meine Favoriten")
+                    .padding(.horizontal)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(favSeries) { series in
+                            NavigationLink(value: series.slug) {
+                                CoverCard(series: seriesWithCover(series))
+                                    .frame(width: 110)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+
+    private func seriesWithCover(_ series: Series) -> Series {
+        if series.coverURL != nil { return series }
+        var copy = series
+        copy.coverURL = catalog.coverURL(for: series.slug)
+        if copy.coverURL == nil { catalog.loadCoverIfNeeded(for: series.slug) }
+        return copy
     }
 
     // MARK: - Sections
@@ -157,6 +193,7 @@ struct ContinueCard: View {
                 .padding(8)
             }
             .frame(width: 150, height: 96)
+            ProgressBar(entry: entry)
             Text(entry.seriesTitle)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(DS.textPrimary)
@@ -180,5 +217,26 @@ struct CoverCard: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
         }
+    }
+}
+
+
+struct ProgressBar: View {
+    let entry: WatchEntry
+    @EnvironmentObject private var history: WatchHistoryStore
+
+    var body: some View {
+        let prog = history.progress(seriesSlug: entry.seriesSlug, season: entry.season, episode: entry.episode)
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.15))
+                if prog > 0 {
+                    Capsule().fill(DS.accent)
+                        .frame(width: geo.size.width * prog)
+                }
+            }
+        }
+        .frame(width: 150, height: 3)
+        .opacity(prog > 0.01 ? 1 : 0)
     }
 }

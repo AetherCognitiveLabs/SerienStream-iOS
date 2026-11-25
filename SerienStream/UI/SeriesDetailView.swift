@@ -44,7 +44,7 @@ struct SeriesDetailView: View {
             }
         }
         .fullScreenCover(item: $playingEpisode) { ep in
-            PlaybackFlowView(episode: ep, seriesTitle: detail?.title ?? "")
+            PlaybackFlowView(episode: ep, seriesTitle: detail?.title ?? "", seasonEpisodes: episodes)
         }
         .task {
             do {
@@ -125,6 +125,28 @@ struct SeriesDetailView: View {
 
     private func content(_ detail: SeriesDetail) -> some View {
         VStack(alignment: .leading, spacing: 20) {
+            if let next = nextUnwatchedEpisode() {
+                Button {
+                    playingEpisode = next
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Weiterschauen: S\(next.season) E\(next.episode)\(next.title.map { " — \($0)" } ?? "")")
+                            .font(.system(size: 15, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 13)
+                    .background(DS.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal)
+                }
+                .buttonStyle(.plain)
+            }
+
             if !detail.description.isEmpty {
                 Text(detail.description)
                     .font(.system(size: 14))
@@ -164,6 +186,18 @@ struct SeriesDetailView: View {
         .padding(.bottom, 40)
     }
 
+    /// Erste Episode der aktuellen Staffel mit gespeicherter Position oder erste ungesehene.
+    private func nextUnwatchedEpisode() -> EpisodeRef? {
+        guard !episodes.isEmpty else { return nil }
+        if let inProgress = episodes.first(where: { history.progress(seriesSlug: slug, season: $0.season, episode: $0.episode) > 0.01 }) {
+            return inProgress
+        }
+        if let unwatched = episodes.first(where: { !history.isWatched(seriesSlug: slug, season: $0.season, episode: $0.episode) }) {
+            return unwatched
+        }
+        return nil
+    }
+
     private var episodeList: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let season = selectedSeason {
@@ -187,30 +221,67 @@ struct SeriesDetailView: View {
                     Button {
                         playingEpisode = ep
                     } label: {
-                        HStack(spacing: 14) {
-                            Text("\(ep.episode)")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(DS.accent)
-                                .frame(width: 34)
-                            Text("Episode \(ep.episode)")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(DS.textPrimary)
-                            Spacer()
-                            if history.isWatched(seriesSlug: slug, season: ep.season, episode: ep.episode) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.green)
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 14) {
+                                Text("\(ep.episode)")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(DS.accent)
+                                    .frame(width: 34)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(ep.title ?? "Episode \(ep.episode)")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(DS.textPrimary)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    if let eng = ep.titleEng, eng != ep.title {
+                                        Text(eng)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(DS.textTertiary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                                if history.isWatched(seriesSlug: slug, season: ep.season, episode: ep.episode) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.green)
+                                }
+                                Image(systemName: "play.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(DS.accent)
                             }
-                            Image(systemName: "play.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(DS.accent)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+
+                            let prog = history.progress(seriesSlug: slug, season: ep.season, episode: ep.episode)
+                            if prog > 0.01 {
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Capsule().fill(Color.white.opacity(0.15))
+                                        Capsule().fill(DS.accent)
+                                            .frame(width: geo.size.width * prog)
+                                    }
+                                }
+                                .frame(height: 3)
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 8)
+                            }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
                         .glass(radius: 14)
                         .padding(.horizontal)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
+                            history.toggleWatched(seriesSlug: slug, seriesTitle: detail?.title ?? slug, season: ep.season, episode: ep.episode)
+                        } label: {
+                            if history.isWatched(seriesSlug: slug, season: ep.season, episode: ep.episode) {
+                                Label("Als ungesehen markieren", systemImage: "eye.slash")
+                            } else {
+                                Label("Als gesehen markieren", systemImage: "eye")
+                            }
+                        }
+                    }
                 }
             }
         }

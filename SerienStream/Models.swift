@@ -23,7 +23,8 @@ struct EpisodeRef: Identifiable, Hashable {
     let season: Int
     let episode: Int
     let seriesSlug: String
-    var title: String?
+    var title: String? = nil
+    var titleEng: String? = nil
 
     var path: String { "/serie/\(seriesSlug)/staffel-\(season)/episode-\(episode)" }
 }

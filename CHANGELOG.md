@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.1.0] - 2026-11-25
+
+### Neu
+- Episodentitel (deutsch + englisch) aus der Staffel-Tabelle
+- Wiedergabe-Position wird gespeichert — Resume beim erneuten Abspielen
+- Fortschrittsbalken auf Episoden und Weiterschauen-Karten
+- Autoplay: nächste Episode startet automatisch mit gleichem Hoster
+- „Nächste Episode"-Overlay im Player
+- „Weiterschauen"-Button auf der Serien-Detailseite
+- Kontextmenü auf Episoden: als gesehen/ungesehen markieren
+- Favoriten-Sektion auf Home
+- Hoster-Sortierung: bevorzugte Sprache + bevorzugter Hoster
+- Neue Settings: Autoplay, Deutsch bevorzugen, bevorzugter Hoster, echte Versionsnummer
+
+### Fix
+- Episoden-Regex: raw-string interpolation (\# statt \) — Episoden laden jetzt
+- Detail-Layout: Backdrop sprengte die Breite, Inhalte waren verschoben
+
 ## [3.0.0] - 2026-11-25
 ### Hinzugefügt
 - Diagnose-System mit In-App-Logs (Settings → Diagnose)

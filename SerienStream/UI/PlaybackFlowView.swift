@@ -15,6 +15,13 @@ struct WebViewRepresentable: UIViewRepresentable {
 struct PlaybackFlowView: View {
     let episode: EpisodeRef
     let seriesTitle: String
+    /// Alle Episoden der Staffel für Autoplay/„Nächste Episode"
+    var seasonEpisodes: [EpisodeRef] = []
+
+    private var nextEpisode: EpisodeRef? {
+        guard let idx = seasonEpisodes.firstIndex(of: episode), idx + 1 < seasonEpisodes.count else { return nil }
+        return seasonEpisodes[idx + 1]
+    }
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var history: WatchHistoryStore
@@ -24,6 +31,8 @@ struct PlaybackFlowView: View {
     @State private var loadingLinks = true
     @State private var linksError: String?
 
+    @State private var currentEpisode: EpisodeRef?
+    @State private var currentLink: EpisodeLink?
     @State private var phase: Phase = .hosterSelection
     @State private var stream: StreamResult?
     @State private var embedFallbackURL: URL?
@@ -45,7 +54,7 @@ struct PlaybackFlowView: View {
         .preferredColorScheme(.dark)
         .task {
             do {
-                links = try await SerienStreamClient.shared.fetchEpisodeLinks(episode)
+                links = sortLinks(try await SerienStreamClient.shared.fetchEpisodeLinks(episode))
                 DLog("Hoster gefunden: \(links.map { $0.providerName }.joined(separator: ", "))", category: "player")
                 if links.isEmpty {
                     linksError = "Keine Hoster gefunden"
@@ -72,7 +81,16 @@ struct PlaybackFlowView: View {
             resolvingView
         case .playing:
             if let stream {
-                PlayerScreen(stream: stream, title: title)
+                PlayerScreen(
+                    stream: stream,
+                    title: title,
+                    episode: activeEpisode,
+                    seriesTitle: seriesTitle,
+                    hasNextEpisode: activeNextEpisode != nil,
+                    onNextEpisode: {
+                        advanceToNextEpisode()
+                    }
+                )
             }
         case .webViewFallback:
             if let url = embedFallbackURL {
@@ -85,11 +103,39 @@ struct PlaybackFlowView: View {
         }
     }
 
+    private var activeEpisode: EpisodeRef {
+        currentEpisode ?? episode
+    }
+
+    private var activeNextEpisode: EpisodeRef? {
+        guard let idx = seasonEpisodes.firstIndex(of: activeEpisode), idx + 1 < seasonEpisodes.count else { return nil }
+        return seasonEpisodes[idx + 1]
+    }
+
     private var title: String {
-        "\(seriesTitle) — S\(episode.season) E\(episode.episode)"
+        "\(seriesTitle) — S\(activeEpisode.season) E\(activeEpisode.episode)"
     }
 
     // MARK: - Hoster-Auswahl
+
+    /// Sortiert Hoster: bevorzugte Sprache zuerst, dann bevorzugter Hoster.
+    private func sortLinks(_ input: [EpisodeLink]) -> [EpisodeLink] {
+        let preferredHoster = UserDefaults.standard.string(forKey: "serienstream.preferredHoster") ?? ""
+        let preferGerman = UserDefaults.standard.object(forKey: "serienstream.preferGerman") as? Bool ?? true
+        return input.sorted { a, b in
+            if preferGerman {
+                let ag = a.languageLabel.lowercased().contains("deutsch")
+                let bg = b.languageLabel.lowercased().contains("deutsch")
+                if ag != bg { return ag }
+            }
+            if !preferredHoster.isEmpty {
+                let ap = a.providerName.lowercased() == preferredHoster.lowercased()
+                let bp = b.providerName.lowercased() == preferredHoster.lowercased()
+                if ap != bp { return ap }
+            }
+            return a.providerName < b.providerName
+        }
+    }
 
     private var hosterSelection: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -163,15 +209,41 @@ struct PlaybackFlowView: View {
         }
     }
 
+    // MARK: - Autoplay
+
+    private func advanceToNextEpisode() {
+        guard let next = activeNextEpisode else { return }
+        currentEpisode = next
+        stream = nil
+        phase = .hosterSelection
+        loadingLinks = true
+        // gleichen Hoster wie zuvor versuchen — sonst erste Wahl
+        let preferredProvider = currentLink?.providerName
+        Task {
+            do {
+                let fresh = try await SerienStreamClient.shared.fetchEpisodeLinks(next)
+                links = sortLinks(fresh)
+                loadingLinks = false
+                if let sameProvider = links.first(where: { $0.providerName == preferredProvider }) ?? links.first {
+                    startResolution(sameProvider)
+                }
+            } catch {
+                loadingLinks = false
+                linksError = error.localizedDescription
+            }
+        }
+    }
+
     // MARK: - Resolver
 
     private func startResolution(_ link: EpisodeLink) {
+        currentLink = link
         phase = .resolving
         errorMessage = nil
         Task {
             do {
                 let embedURL = try await resolver.resolve(
-                    episodePath: episode.path,
+                    episodePath: activeEpisode.path,
                     link: link,
                     baseURL: SerienStreamClient.shared.baseURL
                 )
@@ -189,19 +261,19 @@ struct PlaybackFlowView: View {
                 if let result {
                     DLog("Stream gefunden: \(result.streamURL.absoluteString)", category: "player")
                     stream = result
-                    history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
+                    history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
                     phase = .playing
                 } else {
                     // Klassische HTML-Extraktion als zweiter Versuch
                     if let classic = try? await HosterExtractor.shared.extract(embedURL: embedURL) {
                         DLog("Stream klassisch gefunden: \(classic.streamURL.absoluteString)", category: "player")
                         stream = classic
-                        history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
+                        history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
                         phase = .playing
                     } else {
                         DLog("Extraktion fehlgeschlagen — WebView-Fallback", category: "player")
                         embedFallbackURL = embedURL
-                        history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
+                        history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
                         phase = .webViewFallback
                     }
                 }
