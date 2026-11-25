@@ -94,7 +94,7 @@ struct PlaybackFlowView: View {
             }
         case .webViewFallback:
             if let url = embedFallbackURL {
-                EmbedPlayerView(embedURL: url, title: title) {
+                EmbedPlayerView(embedURL: url, title: title, existingWebView: resolver.webView) {
                     dismiss()
                 }
             }
@@ -410,9 +410,14 @@ struct GlassButtonStyle: ButtonStyle {
 struct EmbedPlayerView: View {
     let embedURL: URL
     let title: String
+    var existingWebView: WKWebView? = nil
     let onClose: () -> Void
 
-    @State private var webView: WKWebView = {
+    private var webView: WKWebView {
+        existingWebView ?? Self.fallbackWebView
+    }
+
+    private static let fallbackWebView: WKWebView = {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
