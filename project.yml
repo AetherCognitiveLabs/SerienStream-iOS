@@ -1,0 +1,51 @@
+name: SerienStream
+options:
+  bundleIdPrefix: com.serienstream
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  SerienStream:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - SerienStream
+    info:
+      path: SerienStream/Info.plist
+      properties:
+        CFBundleName: SerienStream
+        CFBundleDisplayName: SerienStream
+        CFBundleIdentifier: com.serienstream.ios
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        CFBundleExecutable: SerienStream
+        CFBundlePackageType: APPL
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.serienstream.ios
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+schemes:
+  SerienStream:
+    build:
+      targets:
+        SerienStream: all
+    run:
+      config: Debug
+    archive:
+      config: Release
