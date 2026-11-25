@@ -70,7 +70,8 @@ final class DirectResolver {
         if tParam == nil || tParam?.isEmpty == true {
             tParam = capture(#"player-iframe"[^>]*src="/r\?t=([^"]+)""#, in: html)
         }
-        guard let t = tParam?.removingPercentEncoding ?? tParam else {
+        // t bleibt percent-enkodiert wie im HTML — wird so in den POST-Body übernommen
+        guard let t = tParam, !t.isEmpty else {
             throw ResolveError.noToken
         }
 
