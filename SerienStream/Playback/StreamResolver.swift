@@ -23,6 +23,7 @@ final class StreamResolver: NSObject, ObservableObject {
     private var completion: ((Result<URL, Error>) -> Void)?
     private var timeoutTask: Task<Void, Never>?
     private var autoSubmitInjected = false
+    private(set) var embedCaptured = false
 
     private static let allowedHosts = ["serienstream.to", "serienstream.cx", "186.2.175.5"]
 
@@ -138,6 +139,12 @@ extension StreamResolver: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        // Nach der Embed-Capture läuft die Extraktions-Phase: alles erlauben,
+        // damit Mirror-Redirects und Player-Navigationen durchgehen.
+        if embedCaptured {
+            decisionHandler(.allow)
+            return
+        }
         guard let url = navigationAction.request.url, let host = url.host else {
             decisionHandler(.allow)
             return
@@ -161,6 +168,7 @@ extension StreamResolver: WKNavigationDelegate {
             if url.scheme == "http" || url.scheme == "https" {
                 DLog("Embed-URL abgefangen: \(url.absoluteString)", category: "resolver")
                 state = .resolvingEmbed
+                embedCaptured = true
                 finish(.success(url))
                 decisionHandler(.cancel)
                 return
@@ -176,10 +184,10 @@ extension StreamResolver: WKNavigationDelegate {
 }
 
 extension StreamResolver: WKUIDelegate {
-    // Popups/Popunder blockieren, aber echte Hoster-Redirects abfangen
+    // Popups/Popunder (Werbung) komplett blockieren — NICHT als Embed werten
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = navigationAction.request.url, !isAllowedHost(url.host) {
-            finish(.success(url))
+        if let url = navigationAction.request.url {
+            DLog("Popup blockiert: \(url.host ?? "?")", category: "resolver")
         }
         return nil
     }

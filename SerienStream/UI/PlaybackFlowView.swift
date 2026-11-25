@@ -56,6 +56,10 @@ struct PlaybackFlowView: View {
                 DLog("Hoster-Fehler: \(error.localizedDescription)", category: "player")
             }
             loadingLinks = false
+            if CommandLine.arguments.contains("-smokeResolver"), let first = links.first {
+                DLog("SmokeResolver: starte automatisch mit \(first.providerName)", category: "smoke")
+                startResolution(first)
+            }
         }
     }
 
@@ -171,19 +175,35 @@ struct PlaybackFlowView: View {
                     link: link,
                     baseURL: SerienStreamClient.shared.baseURL
                 )
-                // Embed gefunden → Stream extrahieren
-                do {
-                    DLog("Extrahiere aus: \(embedURL.absoluteString)", category: "player")
-                    let result = try await HosterExtractor.shared.extract(embedURL: embedURL)
+                // Embed gefunden → in derselben WebView laden und Stream-Netzwerkverkehr scannen
+                DLog("Embed gefunden: \(embedURL.absoluteString) — lade zur Extraktion", category: "player")
+                var result: StreamResult?
+                if let webView = resolver.webView {
+                    var request = URLRequest(url: embedURL)
+                    request.setValue(SerienStreamClient.shared.baseURL + "/", forHTTPHeaderField: "Referer")
+                    request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+                    await MainActor.run { webView.load(request) }
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    result = await WebViewStreamExtractor.scan(in: webView, embedURL: embedURL)
+                }
+                if let result {
                     DLog("Stream gefunden: \(result.streamURL.absoluteString)", category: "player")
                     stream = result
                     history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
                     phase = .playing
-                } catch {
-                    DLog("Extraktion fehlgeschlagen: \(error.localizedDescription) — WebView-Fallback", category: "player")
-                    embedFallbackURL = embedURL
-                    history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
-                    phase = .webViewFallback
+                } else {
+                    // Klassische HTML-Extraktion als zweiter Versuch
+                    if let classic = try? await HosterExtractor.shared.extract(embedURL: embedURL) {
+                        DLog("Stream klassisch gefunden: \(classic.streamURL.absoluteString)", category: "player")
+                        stream = classic
+                        history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
+                        phase = .playing
+                    } else {
+                        DLog("Extraktion fehlgeschlagen — WebView-Fallback", category: "player")
+                        embedFallbackURL = embedURL
+                        history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
+                        phase = .webViewFallback
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription

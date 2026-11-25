@@ -25,6 +25,7 @@ struct RootView: View {
     @EnvironmentObject private var catalog: CatalogStore
     @EnvironmentObject private var favorites: FavoritesStore
     @State private var ciRef: CIRef?
+    @State private var ciPlayback: EpisodeRef?
 
     var body: some View {
         TabView {
@@ -56,10 +57,16 @@ struct RootView: View {
                     }
             }
         }
+        .fullScreenCover(item: $ciPlayback) { ep in
+            PlaybackFlowView(episode: ep, seriesTitle: "CI-Test")
+        }
         .onAppear {
             if let idx = CommandLine.arguments.firstIndex(of: "-openSeries"),
                CommandLine.arguments.count > idx + 1 {
                 ciRef = CIRef(slug: CommandLine.arguments[idx + 1])
+            }
+            if CommandLine.arguments.contains("-smokeResolver") {
+                ciPlayback = EpisodeRef(season: 1, episode: 1, seriesSlug: "und-dann-noch-paula", title: nil)
             }
         }
     }
