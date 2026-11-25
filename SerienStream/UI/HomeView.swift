@@ -27,6 +27,8 @@ struct HomeView: View {
                         continueWatchingSection
                     }
 
+                    NewEpisodesSection()
+
                     favoritesSection
 
                     genreChips
@@ -343,5 +345,92 @@ struct HeroCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .contentShape(Rectangle())
+    }
+}
+
+
+// MARK: - Neue Episoden (Kalender)
+
+struct NewEpisodesSection: View {
+    @State private var episodes: [SerienStreamClient.CalendarEpisode] = []
+    @State private var loaded = false
+
+    private var shown: [SerienStreamClient.CalendarEpisode] {
+        // Nur veröffentlichte, dedupliziert pro Serie (neueste Episode zuerst)
+        var seen = Set<String>()
+        var out: [SerienStreamClient.CalendarEpisode] = []
+        for ep in episodes where ep.released {
+            if seen.contains(ep.seriesSlug) { continue }
+            seen.insert(ep.seriesSlug)
+            out.append(ep)
+            if out.count >= 15 { break }
+        }
+        return out
+    }
+
+    var body: some View {
+        if !shown.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Neue Episoden")
+                    .padding(.horizontal)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(shown) { ep in
+                            NavigationLink(value: ep.seriesSlug) {
+                                NewEpisodeCard(episode: ep)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        } else if !loaded {
+            Color.clear.frame(height: 0)
+                .task {
+                    episodes = (try? await SerienStreamClient.shared.fetchCalendar()) ?? []
+                    loaded = true
+                }
+        }
+    }
+}
+
+struct NewEpisodeCard: View {
+    let episode: SerienStreamClient.CalendarEpisode
+
+    private var dateLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: episode.date) else { return episode.date }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "de_DE")
+        out.dateFormat = "EEE, d. MMM"
+        return out.string(from: date)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .bottomLeading) {
+                CoverImage(url: episode.coverURL)
+                    .frame(width: 120, height: 172)
+                Text("S\(episode.season) E\(episode.episode)")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(DS.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .padding(7)
+            }
+            .frame(width: 120, height: 172)
+            Text(episode.title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(DS.textPrimary)
+                .lineLimit(1)
+            Text(dateLabel)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(DS.textTertiary)
+        }
+        .frame(width: 120, alignment: .leading)
     }
 }

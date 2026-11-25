@@ -271,6 +271,61 @@ final class SerienStreamClient {
         return slides
     }
 
+    // MARK: - Kalender (Neue Episoden)
+
+    struct CalendarEpisode: Identifiable {
+        var id: String { "\(seriesSlug)-s\(season)e\(episode)-\(date)" }
+        let date: String
+        let time: String
+        let title: String
+        let season: Int
+        let episode: Int
+        let released: Bool
+        let seriesSlug: String
+        let coverURL: URL?
+    }
+
+    /// /api/calendar — Episoden-Kalender der letzten/kommenden Tage (JSON)
+    func fetchCalendar() async throws -> [CalendarEpisode] {
+        guard let url = URL(string: baseURL + "/api/calendar") else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: [[String: Any]]] else { return [] }
+        var episodes: [CalendarEpisode] = []
+        // Neueste zuerst, aber nur vergangene/heutige Tage mit released Episoden zuerst
+        for (date, items) in root.sorted(by: { $0.key > $1.key }) {
+            for item in items {
+                guard let title = item["title"] as? String,
+                      let season = item["season"] as? Int,
+                      let episode = item["episode"] as? Int,
+                      let path = item["url"] as? String else { continue }
+                // Slug aus /serie/SLUG/staffel-N[/episode-M]
+                var slug = path
+                if slug.hasPrefix("/serie/") { slug = String(slug.dropFirst("/serie/".count)) }
+                if let r = slug.range(of: "/staffel-") { slug = String(slug[..<r.lowerBound]) }
+                guard !slug.isEmpty else { continue }
+                var cover: URL?
+                if let c = item["cover_url"] as? String {
+                    cover = absoluteURL(c)
+                }
+                episodes.append(CalendarEpisode(
+                    date: date,
+                    time: item["time"] as? String ?? "",
+                    title: title,
+                    season: season,
+                    episode: episode,
+                    released: item["released"] as? Bool ?? false,
+                    seriesSlug: slug,
+                    coverURL: cover
+                ))
+            }
+        }
+        return episodes
+    }
+
     // MARK: - Detail
 
     func fetchDetail(slug: String) async throws -> SeriesDetail {
