@@ -31,6 +31,11 @@ final class WebViewStreamExtractor {
             (function() {
                 var found = [];
                 try {
+                    if (window.__ssStreamURLs && window.__ssStreamURLs.length) {
+                        for (var k = 0; k < window.__ssStreamURLs.length; k++) found.push(window.__ssStreamURLs[k]);
+                    }
+                } catch(e) {}
+                try {
                     var entries = performance.getEntriesByType('resource');
                     for (var i = 0; i < entries.length; i++) {
                         var n = entries[i].name;
