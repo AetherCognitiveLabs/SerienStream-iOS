@@ -340,7 +340,9 @@ struct HeroCard: View {
                 .background(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 30)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()

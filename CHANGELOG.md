@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.2.0] - 2026-11-25
+
+### Player — komplett neu
+- **Kein Cloudflare-Turnstile mehr nötig**: Direct-Resolver löst Hoster rein über HTTP auf (POST /r mit signiertem Token — das Gate war nur UI)
+- Nahtloser Handoff: WebView-Fallback scannt im Hintergrund weiter und wechselt automatisch in den nativen Player
+- Autoplay im Web-Player (mediaTypesRequiringUserActionForPlayback)
+- XHR/fetch-Netzwerk-Hook schreibt Stream-URLs ab dem ersten Byte mit
+- Tracking-URLs (jwpltx etc.) werden nicht mehr als Stream erkannt
+
+### Design — Apple-TV-Stil
+- Cinematic Hero-Carousel auf Home mit echten Homepage-Backdrops, Auto-Rotation und „Jetzt ansehen"
+- „Neue Episoden"-Sektion aus dem offiziellen Episoden-Kalender (Cover, S/E-Badge, Datum)
+- Detail-Seite: großes Backdrop-Hero, Serienlogo (TMDB), Badge-Zeile mit Score/Jahr/FSK/Genres
+- TMDB-Integration: Score, Logo, HD-Backdrop — API-Key in den Einstellungen hinterlegbar
+
 ## [3.1.0] - 2026-11-25
 
 ### Neu
