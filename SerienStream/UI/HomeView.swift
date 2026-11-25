@@ -244,51 +244,53 @@ struct ProgressBar: View {
 }
 
 
-// MARK: - Cinematic Hero Carousel (Apple-TV-Stil)
+// MARK: - Cinematic Hero Carousel (Apple-TV-Stil) — echte Homepage-Heroes
 
 struct HeroCarousel: View {
     @ObservedObject var catalog: CatalogStore
-    @State private var backdrops: [String: URL] = [:]
+    @State private var slides: [SerienStreamClient.HeroSlide] = []
     @State private var selection = 0
-
-    private var featured: [Series] {
-        guard let first = catalog.sections.first else { return [] }
-        return Array(first.series.prefix(7))
-    }
+    @State private var autoAdvanceTask: Task<Void, Never>?
 
     var body: some View {
-        if !featured.isEmpty {
+        if !slides.isEmpty {
             TabView(selection: $selection) {
-                ForEach(Array(featured.enumerated()), id: \.element.id) { index, series in
-                    NavigationLink(value: series.slug) {
-                        HeroCard(series: series, backdropURL: backdrops[series.slug])
+                ForEach(Array(slides.enumerated()), id: \.offset) { index, slide in
+                    NavigationLink(value: slide.slug) {
+                        HeroCard(slide: slide)
                     }
                     .buttonStyle(.plain)
                     .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))
-            .frame(height: 250)
+            .frame(height: 260)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .padding(.horizontal)
-            .task(id: featured.map { $0.id }.joined(separator: ",")) {
-                await loadBackdrops()
-            }
+            .onAppear { startAutoAdvance() }
+            .onDisappear { autoAdvanceTask?.cancel() }
+        } else {
+            Color.clear.frame(height: 0)
+                .task { await load() }
         }
     }
 
-    private func loadBackdrops() async {
-        for series in featured where backdrops[series.slug] == nil {
-            if let detail = try? await SerienStreamClient.shared.fetchDetail(slug: series.slug) {
-                var url = detail.backdropURL
-                // HD-Backdrop von TMDB bevorzugen, wenn konfiguriert
-                if TMDBClient.shared.isConfigured,
-                   let tmdb = await TMDBClient.shared.enrich(title: detail.title, imdbId: detail.imdbId, cacheKey: series.slug),
-                   let hd = tmdb.backdropURL {
-                    url = hd
-                }
-                if let url {
-                    await MainActor.run { backdrops[series.slug] = url }
+    private func load() async {
+        if let heroes = try? await SerienStreamClient.shared.fetchHomeHeroes(), !heroes.isEmpty {
+            await MainActor.run { slides = heroes }
+        }
+    }
+
+    private func startAutoAdvance() {
+        autoAdvanceTask?.cancel()
+        autoAdvanceTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled, !slides.isEmpty else { return }
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        selection = (selection + 1) % slides.count
+                    }
                 }
             }
         }
@@ -296,68 +298,50 @@ struct HeroCarousel: View {
 }
 
 struct HeroCard: View {
-    let series: Series
-    let backdropURL: URL?
+    let slide: SerienStreamClient.HeroSlide
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            if let backdropURL {
-                AsyncImage(url: backdropURL) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        fallbackCover
-                    }
+            AsyncImage(url: slide.backdropURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .empty:
+                    DS.bgElevated.overlay(ProgressView().tint(DS.textTertiary))
+                default:
+                    DS.bgElevated
                 }
-            } else {
-                fallbackCover
             }
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.85)],
-                startPoint: UnitPoint(x: 0.5, y: 0.3),
+                colors: [.clear, .black.opacity(0.55), .black.opacity(0.9)],
+                startPoint: UnitPoint(x: 0.5, y: 0.25),
                 endPoint: .bottom
             )
 
-            HStack(alignment: .bottom, spacing: 12) {
-                CoverImage(url: series.coverURL, cornerRadius: 12)
-                    .frame(width: 68, height: 98)
-                    .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(series.title)
-                        .font(.system(size: 19, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .shadow(color: .black.opacity(0.7), radius: 6, y: 2)
-                    HStack(spacing: 5) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9, weight: .bold))
-                        Text("Jetzt ansehen")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                Spacer()
+                Text(slide.title)
+                    .font(.system(size: 24, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(DS.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.7), radius: 8, y: 2)
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Jetzt ansehen")
+                        .font(.system(size: 13, weight: .bold))
                 }
-                Spacer(minLength: 0)
+                .foregroundColor(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
-            .padding(14)
+            .padding(18)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-    }
-
-    private var fallbackCover: some View {
-        AsyncImage(url: series.coverURL) { phase in
-            if case .success(let image) = phase {
-                image.resizable().aspectRatio(contentMode: .fill)
-                    .blur(radius: 24)
-                    .overlay(Color.black.opacity(0.35))
-            } else {
-                Color(white: 0.1)
-            }
-        }
+        .contentShape(Rectangle())
     }
 }

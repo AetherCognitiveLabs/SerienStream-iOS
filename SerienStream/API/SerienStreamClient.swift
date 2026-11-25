@@ -244,6 +244,33 @@ final class SerienStreamClient {
         return result
     }
 
+    // MARK: - Homepage Hero
+
+    struct HeroSlide {
+        let slug: String
+        let title: String
+        let backdropURL: URL?
+    }
+
+    /// Echte Homepage-Hero-Slides (Backdrop + Titel) von /
+    func fetchHomeHeroes() async throws -> [HeroSlide] {
+        let html = try await fetchHTML("/")
+        let links = matches(#"<a href="(/serie/[^"]+)" class="home-hero-overlay""#, in: html)
+        let imgs = matches(#"(/media/images/backdrop/hero-desktop/[^"\s]+?format=jpg)"#, in: html)
+        let alts = matches(#"alt="([^"]+) backdrop""#, in: html)
+        var slides: [HeroSlide] = []
+        for (i, link) in links.enumerated() where link.count >= 2 {
+            let slug = String(link[1].dropFirst("/serie/".count))
+            let title = i < alts.count && alts[i].count >= 2 ? decodeEntities(alts[i][1]) : slug
+            var backdrop: URL?
+            if i < imgs.count && imgs[i].count >= 2 {
+                backdrop = absoluteURL(imgs[i][1])
+            }
+            slides.append(HeroSlide(slug: slug, title: title, backdropURL: backdrop))
+        }
+        return slides
+    }
+
     // MARK: - Detail
 
     func fetchDetail(slug: String) async throws -> SeriesDetail {
