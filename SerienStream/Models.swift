@@ -10,7 +10,7 @@ struct Series: Identifiable, Hashable, Codable {
 
 struct SeriesDetail {
     let slug: String
-    let title: String
+    var title: String
     var description: String
     var genres: [String]
     var coverURL: URL?

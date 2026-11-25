@@ -2,11 +2,12 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var catalog: CatalogStore
-    let genres: [(name: String, label: String)] = [
-        ("action", "Action"), ("animation", "Animation"), ("anime", "Anime"),
-        ("comedy", "Comedy"), ("drama", "Drama"), ("fantasy", "Fantasy"),
-        ("horror", "Horror"), ("krimi", "Krimi"), ("sci-fi", "Sci-Fi"),
-        ("thriller", "Thriller"), ("dokumentation", "Doku"), ("familie", "Familie")
+    struct GenreItem: Identifiable { let id: String; let label: String }
+    let genres: [GenreItem] = [
+        GenreItem(id: "action", label: "Action"), GenreItem(id: "animation", label: "Animation"), GenreItem(id: "anime", label: "Anime"),
+        GenreItem(id: "comedy", label: "Comedy"), GenreItem(id: "drama", label: "Drama"), GenreItem(id: "fantasy", label: "Fantasy"),
+        GenreItem(id: "horror", label: "Horror"), GenreItem(id: "krimi", label: "Krimi"), GenreItem(id: "sci-fi", label: "Sci-Fi"),
+        GenreItem(id: "thriller", label: "Thriller"), GenreItem(id: "dokumentation", label: "Doku"), GenreItem(id: "familie", label: "Familie")
     ]
 
     private let columns = [
@@ -82,8 +83,8 @@ struct HomeView: View {
     private var genreChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(genres, id: \.name) { genre in
-                    NavigationLink(value: "genre:\(genre.name)") {
+                ForEach(genres) { genre in
+                    NavigationLink(value: "genre:\(genre.id)") {
                         Text(genre.label)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(DS.textPrimary)
