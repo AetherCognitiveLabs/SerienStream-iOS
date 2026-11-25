@@ -296,7 +296,7 @@ final class SerienStreamClient {
 
     func fetchEpisodes(slug: String, season: Int) async throws -> [EpisodeRef] {
         let html = try await fetchHTML("/serie/\(slug)/staffel-\(season)")
-        let rows = matches(#"/serie/[^"/]+/staffel-\(season)/episode-(\d+)"#, in: html)
+        let rows = matches(#"/serie/[^"/]+/staffel-\#(season)/episode-(\d+)"#, in: html)
         var nums = Set<Int>()
         for r in rows where r.count >= 2 {
             if let n = Int(r[1]) { nums.insert(n) }

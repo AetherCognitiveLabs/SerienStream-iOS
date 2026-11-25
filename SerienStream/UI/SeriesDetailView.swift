@@ -87,6 +87,7 @@ struct SeriesDetailView: View {
                     DS.bgElevated
                 }
             }
+            .frame(maxWidth: UIScreen.main.bounds.width)
             .frame(height: 260)
             .clipped()
             .overlay(
@@ -106,6 +107,7 @@ struct SeriesDetailView: View {
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundColor(DS.textPrimary)
                         .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                     if !detail.genres.isEmpty {
                         Text(detail.genres.prefix(4).map { $0.capitalized }.joined(separator: " · "))
                             .font(.system(size: 12, weight: .medium))
