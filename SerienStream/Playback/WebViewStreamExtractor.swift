@@ -34,7 +34,7 @@ final class WebViewStreamExtractor {
                     var entries = performance.getEntriesByType('resource');
                     for (var i = 0; i < entries.length; i++) {
                         var n = entries[i].name;
-                        if (/\\.(m3u8|mp4)(\\?|$)/i.test(n) || n.includes('.m3u8')) found.push(n);
+                        if (/\\.(m3u8|mp4)(\\?|&|$)/i.test(n)) found.push(n);
                     }
                 } catch(e) {}
                 try {
@@ -56,12 +56,14 @@ final class WebViewStreamExtractor {
                 }
                 continue
             }
-            // m3u8 bevorzugen, dann mp4
+            // master.m3u8 (adaptive) zuerst, dann andere m3u8, dann mp4
             let sorted = urls.sorted { a, b in
-                let aM3u8 = a.contains(".m3u8")
-                let bM3u8 = b.contains(".m3u8")
-                if aM3u8 != bM3u8 { return aM3u8 }
-                return a.count < b.count
+                func rank(_ u: String) -> Int {
+                    if u.contains("master") && u.contains(".m3u8") { return 0 }
+                    if u.contains(".m3u8") { return 1 }
+                    return 2
+                }
+                return rank(a) < rank(b)
             }
             for candidate in sorted {
                 guard let url = URL(string: candidate),
