@@ -66,38 +66,6 @@ final class StreamResolver: NSObject, ObservableObject {
         let hookScript = WKUserScript(source: hookJS, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         config.userContentController.addUserScript(hookScript)
 
-        // Netzwerk-Hook: schreibt m3u8/mp4-URLs aus XHR/fetch/video.src ab Document-Start mit
-        let hookJS = """
-        (function() {
-            if (window.__ssHooked) return; window.__ssHooked = true;
-            window.__ssStreamURLs = window.__ssStreamURLs || [];
-            function check(u) {
-                try {
-                    var s = String(u && u.url ? u.url : u);
-                    if (!s || s.indexOf('http') !== 0) return;
-                    var path = s.split('?')[0].split('#')[0].toLowerCase();
-                    if (/\\.(m3u8|mp4)$/i.test(path) && !/jwpltx|doubleclick|googlesyndication|imasdk|tracking|analytics|ping\\./i.test(s)) {
-                        if (window.__ssStreamURLs.indexOf(s) === -1) window.__ssStreamURLs.push(s);
-                    }
-                } catch (e) {}
-            }
-            var ox = window.XMLHttpRequest.prototype.open;
-            window.XMLHttpRequest.prototype.open = function(m, u) { check(u); return ox.apply(this, arguments); };
-            var of = window.fetch;
-            if (of) { window.fetch = function(u) { check(u); return of.apply(this, arguments); }; }
-            try {
-                var desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
-                if (desc && desc.set) {
-                    Object.defineProperty(HTMLMediaElement.prototype, 'src', {
-                        set: function(v) { check(v); return desc.set.call(this, v); },
-                        get: desc.get
-                    });
-                }
-            } catch (e) {}
-        })();
-        """
-        let hookScript = WKUserScript(source: hookJS, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-        config.userContentController.addUserScript(hookScript)
 
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
@@ -137,6 +105,38 @@ final class StreamResolver: NSObject, ObservableObject {
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
+
+        // Netzwerk-Hook auch im Gate-Flow (falls dieser als Fallback laeuft)
+        let extractHookJS = """
+        (function() {
+            if (window.__ssHooked) return; window.__ssHooked = true;
+            window.__ssStreamURLs = window.__ssStreamURLs || [];
+            function check(u) {
+                try {
+                    var s = String(u && u.url ? u.url : u);
+                    if (!s || s.indexOf('http') !== 0) return;
+                    var path = s.split('?')[0].split('#')[0].toLowerCase();
+                    if (/\\.(m3u8|mp4)$/i.test(path) && !/jwpltx|doubleclick|googlesyndication|imasdk|tracking|analytics|ping\\./i.test(s)) {
+                        if (window.__ssStreamURLs.indexOf(s) === -1) window.__ssStreamURLs.push(s);
+                    }
+                } catch (e) {}
+            }
+            var ox = window.XMLHttpRequest.prototype.open;
+            window.XMLHttpRequest.prototype.open = function(m, u) { check(u); return ox.apply(this, arguments); };
+            var of = window.fetch;
+            if (of) { window.fetch = function(u) { check(u); return of.apply(this, arguments); }; }
+            try {
+                var desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+                if (desc && desc.set) {
+                    Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+                        set: function(v) { check(v); return desc.set.call(this, v); },
+                        get: desc.get
+                    });
+                }
+            } catch (e) {}
+        })();
+        """
+        config.userContentController.addUserScript(WKUserScript(source: extractHookJS, injectionTime: .atDocumentStart, forMainFrameOnly: false))
 
         // Auto-Solver: läuft in JEDEM Frame (inkl. Cloudflare-Turnstile-Iframe)
         // und klickt die Checkbox + Weiter-Buttons automatisch.
