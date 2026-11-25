@@ -38,11 +38,13 @@ final class CatalogStore: ObservableObject {
             let cat = try await catalogTask
             let sec = (try? await sectionsTask) ?? []
             catalog = cat
+            DLog("Katalog: \(cat.count) Serien, Sektionen: \(sec.count)", category: "catalog")
             sections = enrichTitles(sections: sec, catalog: cat)
             cacheCoversFromSections()
             catalogLoaded = true
             saveCache()
         } catch {
+            DLog("Katalog-Fehler: \(error.localizedDescription)", category: "catalog")
             self.error = error.localizedDescription
         }
         loading = false

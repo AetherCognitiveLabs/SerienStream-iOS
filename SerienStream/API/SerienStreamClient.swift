@@ -57,8 +57,11 @@ final class SerienStreamClient {
         do {
             let (_, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { return false }
-            return (200..<400).contains(http.statusCode)
+            let ok = (200..<400).contains(http.statusCode)
+            DLog("Probe \(endpointURL): \(http.statusCode)", category: "probe")
+            return ok
         } catch {
+            DLog("Probe \(endpointURL): \(error.localizedDescription)", category: "probe")
             return false
         }
     }
@@ -104,15 +107,19 @@ final class SerienStreamClient {
             do {
                 let (data, response) = try await session.data(for: request)
                 guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                    lastError = AppError.network("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    DLog("HTTP \(code) für \(base)\(path)", category: "net")
+                    lastError = AppError.network("HTTP \(code)")
                     continue
                 }
                 guard let html = String(data: data, encoding: .utf8) else {
                     lastError = AppError.parsing("Ungültige Kodierung")
                     continue
                 }
+                DLog("OK \(base)\(path) (\(data.count) bytes)", category: "net")
                 return html
             } catch {
+                DLog("Fehler \(base)\(path): \(error.localizedDescription)", category: "net")
                 lastError = error
             }
         }

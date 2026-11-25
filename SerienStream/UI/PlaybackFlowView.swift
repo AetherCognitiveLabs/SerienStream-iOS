@@ -46,9 +46,14 @@ struct PlaybackFlowView: View {
         .task {
             do {
                 links = try await SerienStreamClient.shared.fetchEpisodeLinks(episode)
-                if links.isEmpty { linksError = "Keine Hoster gefunden" }
+                DLog("Hoster gefunden: \(links.map { $0.providerName }.joined(separator: ", "))", category: "player")
+                if links.isEmpty {
+                    linksError = "Keine Hoster gefunden"
+                    DLog("Keine Hoster auf \(episode.path)", category: "player")
+                }
             } catch {
                 linksError = error.localizedDescription
+                DLog("Hoster-Fehler: \(error.localizedDescription)", category: "player")
             }
             loadingLinks = false
         }
@@ -168,12 +173,14 @@ struct PlaybackFlowView: View {
                 )
                 // Embed gefunden → Stream extrahieren
                 do {
+                    DLog("Extrahiere aus: \(embedURL.absoluteString)", category: "player")
                     let result = try await HosterExtractor.shared.extract(embedURL: embedURL)
+                    DLog("Stream gefunden: \(result.streamURL.absoluteString)", category: "player")
                     stream = result
                     history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
                     phase = .playing
                 } catch {
-                    // Fallback: Embed direkt in WebView abspielen
+                    DLog("Extraktion fehlgeschlagen: \(error.localizedDescription) — WebView-Fallback", category: "player")
                     embedFallbackURL = embedURL
                     history.markPlayed(seriesSlug: episode.seriesSlug, seriesTitle: seriesTitle, season: episode.season, episode: episode.episode)
                     phase = .webViewFallback

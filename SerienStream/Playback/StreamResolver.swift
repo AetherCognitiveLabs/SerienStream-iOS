@@ -64,6 +64,7 @@ final class StreamResolver: NSObject, ObservableObject {
             finish(.failure(AppError.resolutionFailed("Ungültige URL")))
             return
         }
+        DLog("Lade Episodenseite: \(url.absoluteString)", category: "resolver")
         wv.load(URLRequest(url: url))
 
         timeoutTask = Task {
@@ -100,7 +101,13 @@ final class StreamResolver: NSObject, ObservableObject {
             return btn ? 'clicked' : 'missing';
         })();
         """
-        webView?.evaluateJavaScript(js) { _, _ in }
+        webView?.evaluateJavaScript(js) { result, error in
+            if let error {
+                DLog("Hoster-Klick JS-Fehler: \(error.localizedDescription)", category: "resolver")
+            } else {
+                DLog("Hoster-Klick: \(result ?? "nil")", category: "resolver")
+            }
+        }
     }
 
     private func finish(_ result: Result<URL, Error>) {
@@ -152,6 +159,7 @@ extension StreamResolver: WKNavigationDelegate {
             }
             // Erfolg nur bei echten http(s)-Navigationen zu externen Hosts
             if url.scheme == "http" || url.scheme == "https" {
+                DLog("Embed-URL abgefangen: \(url.absoluteString)", category: "resolver")
                 state = .resolvingEmbed
                 finish(.success(url))
                 decisionHandler(.cancel)

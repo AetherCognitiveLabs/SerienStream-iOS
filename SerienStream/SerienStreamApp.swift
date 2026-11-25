@@ -14,6 +14,7 @@ struct SerienStreamApp: App {
                 .environmentObject(history)
                 .preferredColorScheme(.dark)
                 .task {
+                    SmokeTest.runIfNeeded()
                     await catalog.loadAll()
                 }
         }
@@ -23,6 +24,7 @@ struct SerienStreamApp: App {
 struct RootView: View {
     @EnvironmentObject private var catalog: CatalogStore
     @EnvironmentObject private var favorites: FavoritesStore
+    @State private var ciRef: CIRef?
 
     var body: some View {
         TabView {
@@ -44,7 +46,28 @@ struct RootView: View {
                 }
         }
         .tint(DS.accent)
+        .fullScreenCover(item: $ciRef) { ref in
+            NavigationStack {
+                SeriesDetailView(slug: ref.slug)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Schließen") { ciRef = nil }
+                        }
+                    }
+            }
+        }
+        .onAppear {
+            if let idx = CommandLine.arguments.firstIndex(of: "-openSeries"),
+               CommandLine.arguments.count > idx + 1 {
+                ciRef = CIRef(slug: CommandLine.arguments[idx + 1])
+            }
+        }
     }
+}
+
+struct CIRef: Identifiable {
+    var id: String { slug }
+    let slug: String
 }
 
 struct FavoritesView: View {

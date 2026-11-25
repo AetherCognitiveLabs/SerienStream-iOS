@@ -16,6 +16,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     endpointSection
                     dataSection
+                    diagnosticsSection
                     aboutSection
                 }
                 .padding(.top, 16)
@@ -197,6 +198,12 @@ struct SettingsView: View {
             .padding(.horizontal)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Diagnose
+
+    private var diagnosticsSection: some View {
+        DiagnosticsView()
     }
 
     // MARK: - About
