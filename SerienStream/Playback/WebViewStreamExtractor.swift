@@ -34,7 +34,8 @@ final class WebViewStreamExtractor {
                     var entries = performance.getEntriesByType('resource');
                     for (var i = 0; i < entries.length; i++) {
                         var n = entries[i].name;
-                        if (/\\.(m3u8|mp4)(\\?|&|$)/i.test(n)) found.push(n);
+                        var path = n.split('?')[0].split('#')[0].toLowerCase();
+                        if (/\\.(m3u8|mp4)$/i.test(path) && !/jwpltx|doubleclick|googlesyndication|imasdk|tracking|analytics|ping\\./i.test(n)) found.push(n);
                     }
                 } catch(e) {}
                 try {
