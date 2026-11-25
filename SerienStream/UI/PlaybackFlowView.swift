@@ -292,12 +292,20 @@ struct PlaybackFlowView: View {
                 return
             }
         }
-        // 3. Fallback: Embed-Webplayer einbetten
-        DLog("Extraktion fehlgeschlagen — WebView-Fallback", category: "player")
+        // 3. Fallback: Embed-Webplayer einbetten — aber im Hintergrund weiter scannen.
+        // Sobald die Nutzerin Play tippt und das m3u8 auftaucht, wechseln wir nahtlos
+        // in den nativen Player.
+        DLog("Extraktion fehlgeschlagen — WebView-Fallback mit Hintergrund-Scan", category: "player")
         await MainActor.run {
             embedFallbackURL = embedURL
             history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
             phase = .webViewFallback
+        }
+        if let webView = resolver.webView {
+            if let late = await WebViewStreamExtractor.scan(in: webView, embedURL: embedURL) {
+                DLog("Stream nachträglich gefunden — Wechsel in nativen Player", category: "player")
+                await startPlayback(late)
+            }
         }
     }
 
@@ -416,7 +424,7 @@ struct EmbedPlayerView: View {
             WebViewRepresentable(webView: webView)
                 .ignoresSafeArea()
             HStack {
-                Text("Web-Player — \(title)")
+                Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(DS.textPrimary)
                 Spacer()
@@ -427,14 +435,32 @@ struct EmbedPlayerView: View {
                     .padding(.vertical, 8)
                     .glass(radius: 10)
             }
-            .padding()
-            .background(DS.bg.opacity(0.9))
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            .background(DS.bg.opacity(0.85))
         }
         .onAppear {
             webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-            var request = URLRequest(url: embedURL)
-            request.setValue(SerienStreamClient.shared.baseURL + "/", forHTTPHeaderField: "Referer")
-            webView.load(request)
+            if webView.url == nil {
+                var request = URLRequest(url: embedURL)
+                request.setValue(SerienStreamClient.shared.baseURL + "/", forHTTPHeaderField: "Referer")
+                webView.load(request)
+            }
+            // Autoplay: Play-Buttons mehrfach anklicken
+            Task {
+                for _ in 0..<6 {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    _ = try? await webView.evaluateJavaScript("""
+                    (function() {
+                        var v = document.querySelector('video');
+                        if (v) { v.muted = false; v.play().catch(function(){}); }
+                        var btns = document.querySelectorAll('.vjs-big-play-button, [class*="play"], button');
+                        for (var i = 0; i < Math.min(btns.length, 4); i++) { try { btns[i].click(); } catch(e){} }
+                        return 1;
+                    })();
+                    """)
+                }
+            }
         }
     }
 }
