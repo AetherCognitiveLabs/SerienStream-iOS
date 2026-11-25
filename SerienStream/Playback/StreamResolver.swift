@@ -32,6 +32,7 @@ final class StreamResolver: NSObject, ObservableObject {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs
@@ -69,6 +70,7 @@ final class StreamResolver: NSObject, ObservableObject {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
 
         // Auto-Solver: läuft in JEDEM Frame (inkl. Cloudflare-Turnstile-Iframe)
         // und klickt die Checkbox + Weiter-Buttons automatisch.

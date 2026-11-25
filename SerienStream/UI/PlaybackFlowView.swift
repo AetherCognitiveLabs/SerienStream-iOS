@@ -404,7 +404,12 @@ struct EmbedPlayerView: View {
     let title: String
     let onClose: () -> Void
 
-    @State private var webView = WKWebView()
+    @State private var webView: WKWebView = {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        return WKWebView(frame: .zero, configuration: config)
+    }()
 
     var body: some View {
         ZStack(alignment: .top) {

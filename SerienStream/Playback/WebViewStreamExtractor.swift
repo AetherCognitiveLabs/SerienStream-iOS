@@ -25,7 +25,7 @@ final class WebViewStreamExtractor {
         _ = try? await webView.evaluateJavaScript(autoplayJS)
 
         // Mehrere Scan-Runden — manche Hoster laden das m3u8 erst nach Klick/Delay
-        for attempt in 0..<8 {
+        for attempt in 0..<12 {
             try? await Task.sleep(nanoseconds: UInt64(1.5 * Double(NSEC_PER_SEC)))
             let scanJS = """
             (function() {
