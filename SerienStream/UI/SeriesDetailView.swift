@@ -53,6 +53,15 @@ struct SeriesDetailView: View {
                 if let first = d.seasons.first {
                     selectedSeason = first
                 }
+                // TMDB-Anreicherung (Score, Logo, HD-Backdrop) — nur wenn Key hinterlegt
+                if TMDBClient.shared.isConfigured, var enriched = detail {
+                    if let tmdb = await TMDBClient.shared.enrich(title: d.title, imdbId: d.imdbId, cacheKey: slug) {
+                        enriched.tmdbScore = tmdb.score
+                        enriched.tmdbLogoURL = tmdb.logoURL
+                        enriched.tmdbBackdropURL = tmdb.backdropURL
+                        detail = enriched
+                    }
+                }
             } catch {
                 self.error = error.localizedDescription
             }
@@ -80,7 +89,7 @@ struct SeriesDetailView: View {
 
     private func hero(_ detail: SeriesDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: detail.backdropURL ?? detail.coverURL) { phase in
+            AsyncImage(url: detail.tmdbBackdropURL ?? detail.backdropURL ?? detail.coverURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().aspectRatio(contentMode: .fill)
                 } else {
@@ -88,37 +97,87 @@ struct SeriesDetailView: View {
                 }
             }
             .frame(maxWidth: UIScreen.main.bounds.width)
-            .frame(height: 260)
+            .frame(height: 340)
             .clipped()
             .overlay(
                 LinearGradient(
-                    colors: [.clear, DS.bg],
-                    startPoint: .top,
+                    colors: [.clear, DS.bg.opacity(0.55), DS.bg],
+                    startPoint: UnitPoint(x: 0.5, y: 0.2),
                     endPoint: .bottom
                 )
             )
 
-            HStack(alignment: .bottom, spacing: 14) {
-                CoverImage(url: detail.coverURL)
-                    .frame(width: 96, height: 138)
-                    .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(detail.title)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(DS.textPrimary)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !detail.genres.isEmpty {
-                        Text(detail.genres.prefix(4).map { $0.capitalized }.joined(separator: " · "))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(DS.textSecondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Spacer()
+                if let logoURL = detail.tmdbLogoURL {
+                    AsyncImage(url: logoURL) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable().aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 220, maxHeight: 80, alignment: .leading)
+                        } else {
+                            titleText(detail)
+                        }
+                    }
+                    .frame(maxWidth: 220, alignment: .leading)
+                } else {
+                    titleText(detail)
+                }
+
+                // Badge-Zeile: Score, Jahr, FSK, Genres
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if let score = detail.tmdbScore {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.yellow)
+                                Text(String(format: "%.1f", score))
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        if let year = detail.year {
+                            metaBadge(year)
+                        }
+                        if let fsk = detail.fsk {
+                            metaBadge("FSK \(fsk)")
+                        }
+                        ForEach(detail.genres.prefix(3), id: \.self) { g in
+                            metaBadge(g.capitalized)
+                        }
+                        if detail.imdbId != nil {
+                            metaBadge("IMDb")
+                        }
                     }
                 }
-                Spacer(minLength: 0)
             }
             .padding(.horizontal)
-            .padding(.bottom, 12)
+            .padding(.bottom, 14)
         }
+        .frame(height: 340)
+    }
+
+    private func titleText(_ detail: SeriesDetail) -> some View {
+        Text(detail.title)
+            .font(.system(size: 26, weight: .heavy, design: .rounded))
+            .foregroundColor(DS.textPrimary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .shadow(color: .black.opacity(0.6), radius: 8, y: 2)
+    }
+
+    private func metaBadge(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(.white.opacity(0.9))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // MARK: - Content

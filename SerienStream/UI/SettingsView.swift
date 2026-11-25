@@ -15,6 +15,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     endpointSection
+                    tmdbSection
                     playbackSection
                     dataSection
                     diagnosticsSection
@@ -229,6 +230,81 @@ struct SettingsView: View {
                 .tint(DS.accent)
         }
         .padding(14)
+    }
+
+    // MARK: - TMDB
+
+    @State private var tmdbKey: String = TMDBClient.shared.apiKey
+    @State private var tmdbSaved = false
+
+    private var tmdbSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("TMDB (Scores, Logos, HD-Bilder)")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(DS.textPrimary)
+                .padding(.horizontal)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    Image(systemName: "star.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(DS.accent)
+                        .frame(width: 34, height: 34)
+                        .background(DS.accent.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("API-Key")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(DS.textPrimary)
+                        Text(TMDBClient.shared.isConfigured ? "Aktiviert — Scores und HD-Bilder werden geladen" : "Kostenlosen Key auf themoviedb.org erstellen")
+                            .font(.system(size: 11))
+                            .foregroundColor(TMDBClient.shared.isConfigured ? .green : DS.textSecondary)
+                    }
+                    Spacer()
+                    if TMDBClient.shared.isConfigured {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    SecureField("TMDB API-Key einfügen", text: $tmdbKey)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(DS.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Button {
+                        TMDBClient.shared.apiKey = tmdbKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                        tmdbSaved = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { tmdbSaved = false }
+                    } label: {
+                        Text(tmdbSaved ? "Gespeichert" : "Speichern")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(DS.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Link(destination: URL(string: "https://www.themoviedb.org/settings/api")!) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                            .font(.system(size: 11))
+                        Text("Kostenlosen Key erstellen (2 Minuten)")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(DS.accent)
+                }
+            }
+            .padding(14)
+            .glass(radius: 14)
+            .padding(.horizontal)
+        }
     }
 
     // MARK: - Daten

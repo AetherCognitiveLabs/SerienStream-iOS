@@ -51,6 +51,62 @@ final class StreamResolver: NSObject, ObservableObject {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
+
+        // Auto-Solver: läuft in JEDEM Frame (inkl. Cloudflare-Turnstile-Iframe)
+        // und klickt die Checkbox + Weiter-Buttons automatisch.
+        let autoSolveJS = """
+        (function() {
+            if (window.__ssAutoSolve) return; window.__ssAutoSolve = true;
+            var tries = 0;
+            var timer = setInterval(function() {
+                tries++;
+                try {
+                    // Turnstile-Checkbox (im CF-Iframe)
+                    var cb = document.querySelector('input[type="checkbox"]');
+                    if (cb && !cb.checked) {
+                        cb.click();
+                        cb.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+                    }
+                    // Turnstile label/div Fallback
+                    var lbl = document.querySelector('label, .ctp-checkbox-label, .cb-lb, #cf-stage label');
+                    if (lbl && typeof lbl.click === 'function' && tries < 30) {
+                        var host = location.hostname || '';
+                        if (host.indexOf('cloudflare') !== -1 || host.indexOf('challenges') !== -1) {
+                            lbl.click();
+                        }
+                    }
+                    // Checkbox-Parent-div (manchmal ist nur der div klickbar)
+                    var ctp = document.querySelector('.ctp-checkbox, .cf-turnstile-wrapper, #cf-stage');
+                    if (ctp && tries < 20) {
+                        var host2 = location.hostname || '';
+                        if (host2.indexOf('cloudflare') !== -1) {
+                            ctp.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+                        }
+                    }
+                    // Weiter-Buttons auf der SerienStream-Gate-Seite
+                    var weiter = document.querySelector('#player-prepare-form button[type="submit"], #player-prepare-form input[type="submit"]');
+                    var resp = document.querySelector('[name="cf-turnstile-response"]');
+                    if (weiter && resp && resp.value && resp.value.length > 10) {
+                        weiter.click();
+                        clearInterval(timer);
+                    }
+                    // Generischer Weiter/Absenden-Button wenn Turnstile gelöst
+                    var buttons = document.querySelectorAll('button, input[type="submit"]');
+                    for (var i = 0; i < buttons.length; i++) {
+                        var t = (buttons[i].textContent || buttons[i].value || '').trim().toLowerCase();
+                        if ((t === 'weiter' || t === 'absenden' || t === 'submit') && resp && resp.value && resp.value.length > 10) {
+                            buttons[i].click();
+                            clearInterval(timer);
+                            break;
+                        }
+                    }
+                } catch (e) {}
+                if (tries > 150) clearInterval(timer);
+            }, 700);
+        })();
+        """
+        let userScript = WKUserScript(source: autoSolveJS, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        config.userContentController.addUserScript(userScript)
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs

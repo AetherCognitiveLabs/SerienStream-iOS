@@ -16,6 +16,14 @@ struct SeriesDetail {
     var coverURL: URL?
     var backdropURL: URL?
     var seasons: [Int]
+    var imdbId: String?
+    var year: String?
+    var fsk: String?
+
+    // TMDB-Anreicherung (optional, wenn API-Key hinterlegt)
+    var tmdbScore: Double?
+    var tmdbLogoURL: URL?
+    var tmdbBackdropURL: URL?
 }
 
 struct EpisodeRef: Identifiable, Hashable {

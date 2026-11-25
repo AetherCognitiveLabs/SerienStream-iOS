@@ -289,6 +289,15 @@ final class SerienStreamClient {
         if detail.description.isEmpty, let og = matches(#"og:description"\s+content="([^"]+)""#, in: html).first, og.count >= 2 {
             detail.description = decodeEntities(og[1])
         }
+        if let imdb = matches(#"imdb\.com/title/(tt\d+)"#, in: html).first, imdb.count >= 2 {
+            detail.imdbId = imdb[1]
+        }
+        if let y = matches(#"href="/jahr/(\d{4})""#, in: html).first, y.count >= 2 {
+            detail.year = y[1]
+        }
+        if let f = matches(#"FSK\s*(\d+)"#, in: html).first, f.count >= 2 {
+            detail.fsk = f[1]
+        }
         return detail
     }
 
