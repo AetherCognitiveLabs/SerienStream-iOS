@@ -92,8 +92,13 @@ final class StreamResolver: NSObject, ObservableObject {
             var timer = setInterval(function() {
                 tries++;
                 var response = document.querySelector('[name="cf-turnstile-response"]');
+                var altcha = document.querySelector('[name="altcha"]');
+                var altchaWidget = document.querySelector('altcha-widget');
                 var form = document.getElementById('player-prepare-form');
-                if (response && response.value && response.value.length > 10 && form) {
+                var tsOk = response && response.value && response.value.length > 10;
+                // ALTCHA: nur abwarten, wenn das Widget existiert und noch kein Wert da ist
+                var altchaOk = !altchaWidget || (altcha && altcha.value && altcha.value.length > 10);
+                if (tsOk && altchaOk && form) {
                     clearInterval(timer);
                     form.requestSubmit ? form.requestSubmit() : form.submit();
                 }
