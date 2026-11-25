@@ -23,7 +23,25 @@ final class StreamResolver: NSObject, ObservableObject {
     private var completion: ((Result<URL, Error>) -> Void)?
     private var timeoutTask: Task<Void, Never>?
     private var autoSubmitInjected = false
-    private(set) var embedCaptured = false
+    var embedCaptured = false
+
+    /// Erstellt eine WebView für die Extraktions-Phase ohne den Gate-Flow zu starten.
+    @MainActor
+    func prepareExtractionWebView() {
+        if webView != nil { return }
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+        config.allowsInlineMediaPlayback = true
+        let prefs = WKWebpagePreferences()
+        prefs.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = prefs
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.navigationDelegate = self
+        wv.uiDelegate = self
+        wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        embedCaptured = true
+        self.webView = wv
+    }
 
     private static let allowedHosts = ["serienstream.to", "serienstream.cx", "186.2.175.5"]
 

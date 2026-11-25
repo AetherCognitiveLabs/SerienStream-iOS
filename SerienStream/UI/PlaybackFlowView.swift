@@ -242,45 +242,70 @@ struct PlaybackFlowView: View {
         errorMessage = nil
         Task {
             do {
-                let embedURL = try await resolver.resolve(
-                    episodePath: activeEpisode.path,
-                    link: link,
-                    baseURL: SerienStreamClient.shared.baseURL
-                )
-                // Embed gefunden → in derselben WebView laden und Stream-Netzwerkverkehr scannen
-                DLog("Embed gefunden: \(embedURL.absoluteString) — lade zur Extraktion", category: "player")
-                var result: StreamResult?
-                if let webView = resolver.webView {
-                    var request = URLRequest(url: embedURL)
-                    request.setValue(SerienStreamClient.shared.baseURL + "/", forHTTPHeaderField: "Referer")
-                    request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-                    await MainActor.run { webView.load(request) }
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    result = await WebViewStreamExtractor.scan(in: webView, embedURL: embedURL)
-                }
-                if let result {
-                    DLog("Stream gefunden: \(result.streamURL.absoluteString)", category: "player")
-                    stream = result
-                    history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
-                    phase = .playing
-                } else {
-                    // Klassische HTML-Extraktion als zweiter Versuch
-                    if let classic = try? await HosterExtractor.shared.extract(embedURL: embedURL) {
-                        DLog("Stream klassisch gefunden: \(classic.streamURL.absoluteString)", category: "player")
-                        stream = classic
-                        history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
-                        phase = .playing
-                    } else {
-                        DLog("Extraktion fehlgeschlagen — WebView-Fallback", category: "player")
-                        embedFallbackURL = embedURL
-                        history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
-                        phase = .webViewFallback
-                    }
-                }
+                // 1. Direct-Resolver: reines HTTP, kein Turnstile nötig
+                let embedURL = try await DirectResolver.shared.resolve(episode: activeEpisode, link: link)
+                DLog("Embed direkt aufgelöst: \(embedURL.absoluteString)", category: "player")
+                await extractAndPlay(embedURL: embedURL)
             } catch {
-                errorMessage = error.localizedDescription
-                phase = .failed
+                DLog("Direct-Resolver fehlgeschlagen: \(error.localizedDescription) — WebView-Gate als Fallback", category: "player")
+                // 2. Fallback: klassischer WebView-Resolver mit Turnstile
+                await resolveViaWebViewGate(link)
             }
+        }
+    }
+
+    private func resolveViaWebViewGate(_ link: EpisodeLink) async {
+        do {
+            let embedURL = try await resolver.resolve(
+                episodePath: activeEpisode.path,
+                link: link,
+                baseURL: SerienStreamClient.shared.baseURL
+            )
+            await extractAndPlay(embedURL: embedURL)
+        } catch {
+            errorMessage = error.localizedDescription
+            phase = .failed
+        }
+    }
+
+    private func extractAndPlay(embedURL: URL) async {
+        // 1. Versuch: klassische HTTP-Extraktion (schnell, wenn Hoster es erlaubt)
+        if let classic = try? await HosterExtractor.shared.extract(embedURL: embedURL) {
+            DLog("Stream klassisch gefunden: \(classic.streamURL.absoluteString)", category: "player")
+            await startPlayback(classic)
+            return
+        }
+        // 2. Versuch: Embed in WebView laden und Netzwerkverkehr scannen
+        await MainActor.run { resolver.prepareExtractionWebView() }
+        if let webView = resolver.webView {
+            var request = URLRequest(url: embedURL)
+            request.setValue(SerienStreamClient.shared.baseURL + "/", forHTTPHeaderField: "Referer")
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+            await MainActor.run {
+                resolver.embedCaptured = true
+                webView.load(request)
+            }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if let result = await WebViewStreamExtractor.scan(in: webView, embedURL: embedURL) {
+                DLog("Stream per Scan gefunden: \(result.streamURL.absoluteString)", category: "player")
+                await startPlayback(result)
+                return
+            }
+        }
+        // 3. Fallback: Embed-Webplayer einbetten
+        DLog("Extraktion fehlgeschlagen — WebView-Fallback", category: "player")
+        await MainActor.run {
+            embedFallbackURL = embedURL
+            history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
+            phase = .webViewFallback
+        }
+    }
+
+    private func startPlayback(_ result: StreamResult) async {
+        await MainActor.run {
+            stream = result
+            history.markPlayed(seriesSlug: activeEpisode.seriesSlug, seriesTitle: seriesTitle, season: activeEpisode.season, episode: activeEpisode.episode)
+            phase = .playing
         }
     }
 
