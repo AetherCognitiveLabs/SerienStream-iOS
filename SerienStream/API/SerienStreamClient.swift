@@ -280,7 +280,7 @@ final class SerienStreamClient {
         }
         detail.seasons = seasons.sorted()
 
-        if let d = matches(#"<div[^>]*class="[^"]*description-text[^"]*"[^>]*>([\s\S]*?)</div>"#, in: html).first, d.count >= 2 {
+        if let d = matches(#"<(?:div|span|p)[^>]*class="[^"]*description-text[^"]*"[^>]*>([\s\S]*?)</(?:div|span|p)>"#, in: html).first, d.count >= 2 {
             detail.description = decodeEntities(stripTags(d[1])).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if detail.description.isEmpty, let d = matches(#"<div[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)</div>"#, in: html).first, d.count >= 2 {
