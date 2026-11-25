@@ -203,7 +203,7 @@ final class SerienStreamClient {
     }
 
     private func attr(_ name: String, in tag: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: #""# + name + #"="([^"]*)""#) else { return nil }
+        guard let regex = try? NSRegularExpression(pattern: name + #"="([^"]*)""#) else { return nil }
         let range = NSRange(tag.startIndex..., in: tag)
         guard let m = regex.firstMatch(in: tag, range: range), m.numberOfRanges >= 2,
               let r = Range(m.range(at: 1), in: tag) else { return nil }
